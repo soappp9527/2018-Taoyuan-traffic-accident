@@ -1,0 +1,176 @@
+---
+title: "2018桃園碰碰車"
+author: "soappp9527"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    runtime: shiny
+    theme: paper
+    social: menu
+    source_code: "https://github.com/soappp9527/2018-Taoyuan-traffic-accident"
+---
+
+```{r global, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(dplyr)
+library(leaflet)
+library(ggplot2)
+library(plotly)
+rawdata<-read.csv("traffic.csv",stringsAsFactors = FALSE,header = T,encoding = 'UTF-8', fileEncoding = 'GB2312')
+colnames(rawdata)<-c("date","time","year","month","week","op.date","op.time","fin.date","fin.time","lng","lat",
+                     "class","address.cat","city","area","address.c","address.n","address.1","address.2",
+                     "address.3","address.4","address.5","address.6","address.7","address.8","address.9",
+                     "cross.1","cross.2","cross.3","cross.4","cross.5","address.other","death.24","death.30",
+                     "hurt","weather.c","weather","light.c","light","road.c","road","limit","rtype.maj.c",
+                     "rtype.maj","rtype.min.c","rtype.min","loc.maj.c","loc.maj","loc.min.c","loc.min","cover.c",
+                     "cover","wet.c","wet","defect.c","defect","obstacle.c","obstacle","viewq.c","viewq","view.c",
+                     "view",
+                     "sign.c","sign","signa.c","signa","division.maj.c","division.maj","division.min.c",
+                     "division.min","division.lane1.c","division.lane1","division.lane2.c","division.lane2",
+                     "division.lane3.c","division.lane3","accident.maj.c","accident.maj","accident.min.c",
+                     "accident.min","reason.maj.c","reason.maj","reason.min.c","reason.min","nationality",
+                     "license.c","license","license.car.c","license.car","car.type.maj.c","car.type.maj",
+                     "car.type.min.c","car.type.min","injury.level.c","injury.level","injury.site.c",
+                     "injury.site","equipment.c","equipment","phone.c","phone","use.c","use","move.maj.c",
+                     "move.maj","move.min.c","move.min","qualification.c","qualification","license.type.maj.c",
+                     "license.type.maj","license.type.min.c","license.type.min","drunk.c","drunk",
+                     "hitsitef.maj.c","hitsitef.maj","hitsitef.min.c","hitsitef.min",
+                     "hitsiteo.maj.c","hitsiteo.maj","hitsiteo.min.c","hitsiteo.min","cause.maj.c","cause.maj",
+                     "cause.min.c","cause.min","esc.c","esc","job.c","job","goal.c","goal")
+rawdata$week <- factor(rawdata$week, levels = c("一", "二", "三", "四", "五", "六","日"))
+rawdata$time<-sprintf("%06d", rawdata$time)#padding zero
+rawdata$hour<-substr(rawdata$time,1,2)
+rawdata$hour<-as.character(rawdata$hour)
+rawdata$drunk<-ifelse(rawdata$drunk%in%c("經呼氣檢測超0.80~mg/L或血液檢測超過0.16%",
+                                         "經呼氣檢測0.41~0.55mg/L或血液檢測0.081%~0.11%",
+                                         "經呼氣檢測0.26~0.40mg/L或血液檢測0.051%~0.08%",
+                                         "經呼氣檢測0.56~0.80mg/L或血液檢測0.111%~0.16%",
+                                         "經呼氣檢測0.16~0.25mg/L或血液檢測0.031%~0.05%"),TRUE,FALSE)
+rawdata[rawdata$car.type.maj%in%c("曳引車","全聯結車","半聯結車"),]$car.type.maj<-"聯結車與曳引車"
+rawdata[rawdata$move.min%in%c("向右變換車道","向左變換車道","超車(含超越)","插入行列"),]$move.min<-"變換車道或超車"
+rawdata[rawdata$reason.min%in%c("左轉彎未依規定","右轉彎未依規定","迴轉未依規定"),]$reason.min<-"轉彎未依規定"
+rawdata[rawdata$reason.min=="未保持行車安全間隔",]$reason.min<-"未保持行車安全距離"
+rawdata[rawdata$reason.min%in%c("違反特定標誌(線)禁制","未靠右行駛","未依規定減速","未依規定行走行人穿越道、地下道、天橋而穿越道路","倒車未依規定","違規停車或暫停不當而肇事","未依標誌、標線、號誌或手勢指揮穿越道路","未依規定使用燈光"),]$reason.min<-"違反號誌管制或指揮"
+rawdata[rawdata$reason.min%in%c("","起步未注意其他車(人)安全","開啟車門不當而肇事","橫越道路不慎","逆向行駛","違規超車","疲勞(患病)駕駛失控","超速失控","搶越行人穿越道","爭(搶)道行駛","停車操作時，未注意其他車(人)安全","穿越道路未注意左右來車","其他引起事故之疏失或行為","其他引起事故之故障","動物竄出","路況危險無安全(警告)設施","煞車失靈","其他裝載不當肇事","蛇行、方向不定","裝載貨物不穩妥","車輪脫落或輪胎爆裂","裝卸貨物不當","使用手持行動電話失控","其他交通管制不當","在道路上嬉戲或奔走不定","裝載未盡安全措施","上下車輛未注意安全","貨物超長、寬、高而肇事","未待乘客安全上下開車","交通管制設施失靈或損毀","車輛零件脫落","方向操縱系統故障","在路上工作未設適當標識","拋錨未採安全措施","載貨超重而失控"),]$reason.min<-"其他引起事故之違規或不當行為"
+```
+
+
+Row
+-----------------------------------------------------------------------
+### 控制面板 {data-width=200}
+
+```{r}
+selectInput(inputId = "area", label = "行政區",choices = c("未選擇","桃園區","觀音區",
+                                                        "中壢區", "楊梅區", "平鎮區",
+                                                        "八德區", "蘆竹區", "大園區",
+                                                        "復興區", "大溪區", "新屋區",
+                                                        "龜山區", "龍潭區")
+)
+selectInput(inputId = "accident", label = "事故類型",
+            choices = c("未選擇","人與汽(機)車", "汽(機)車本身", "車與車")
+)
+selectInput(inputId = "car", label = "車種",
+            choices = c("未選擇","小客車", "大客車", "機車" , "小貨車(含客、貨兩用)",
+                        "大貨車", "聯結車與曳引車", "慢車")
+)
+selectInput(inputId = "move", label = "車輛行進狀態",
+            choices = c("未選擇", "向前直行中", "右轉彎", "左轉彎",
+                        "變換車道或超車", "迴轉或橫越道路中")
+)
+checkboxInput(inputId = "drunk", label = "只顯示酒駕", value = FALSE)
+```
+
+### 車禍在哪裡發生? {data-width=500}
+
+```{r}
+flitered.area<-reactive({
+  if(input$area=="未選擇"){
+    rawdata
+  }else{
+    rawdata[rawdata$area==input$area,]
+  }
+})
+flitered.accident<-reactive({
+  if(input$accident=="未選擇"){
+    flitered.area()
+  }else{
+    flitered.area()[flitered.area()$accident.maj==input$accident,]
+  }
+})
+flitered.car<-reactive({
+  if(input$car=="未選擇"){
+    flitered.accident()
+  }else{
+    flitered.accident()[flitered.accident()$car.type.maj==input$car,]
+  }
+})
+flitered.move<-reactive({
+  if(input$move=="未選擇"){
+    flitered.car()
+  }else{
+    flitered.car()[flitered.car()$move.min==input$move,]
+  }
+})
+flitered.drunk<-reactive({
+  if(isFALSE(input$drunk)){
+    flitered.move()
+  }else{
+    flitered.move()[flitered.move()$drunk==input$drunk,]
+  }
+})
+
+ pal <- colorFactor(c("#fd5f00", "#3366CC"),domain = c("A1","A2"))
+  output$map <- renderLeaflet(
+    leaflet()%>%
+      addProviderTiles(providers$Stamen.Toner)%>%
+      setView(lng = 121.194, lat = 24.961, zoom = 12)%>%
+      addLegend("bottomleft", pal = pal, values = rawdata$class,title = "嚴重程度")
+  )
+output$markers <- renderPlot({
+    leafletProxy("map") %>%
+      clearMarkers()%>%
+      addCircleMarkers(lng = flitered.drunk()$lng,lat = flitered.drunk()$lat,
+                       radius = ifelse(flitered.drunk()$class == "A1", 4.5, 2.5),
+                       popup = paste("事故日期：",flitered.drunk()$date, "<br>",
+                                     "事故時間：",flitered.drunk()$time,"<br>",
+                                     "事故類型：",flitered.drunk()$accident.maj,"<br>",
+                                     "事故位置：",flitered.drunk()$loc.min,"<br>",
+                                     "肇事原因：",flitered.drunk()$cause.min),
+                       stroke = FALSE,fillOpacity = 0.8,color = pal(flitered.drunk()$class))
+  })
+
+leafletOutput("map", width = "100%", height = "100%")
+plotOutput("markers", width = "100%", height = "100%")
+```
+
+### 為甚麼會發生?
+
+```{r}
+renderPlotly(
+    ggplotly(
+      ggplot(flitered.drunk())+aes(x = reason.min,fill=loc.maj,
+                                   text = paste("事故原因:",reason.min,"<br>",
+                                                "道路類型:",loc.maj))+geom_bar(position = "stack")+
+        coord_flip()+labs(x = NULL, y = "案件數",fill=NULL)+ theme_bw(),
+      tooltip = c("text","count"))
+  )
+
+```
+
+Row{data-height=400}
+-----------------------------------------------------------------------
+
+### 什麼時候發生?
+
+```{r}
+renderPlotly(
+    ggplotly(
+      ggplot(flitered.drunk())+aes(x = hour,group=week,color= week,
+                                   text = paste("星期",week))+geom_line(stat="count")+
+               labs(x = "發生時間(小時)", y = "案件數",color=NULL)+ theme_bw(),
+      tooltip = c("text","count"))
+  )
+```
+
